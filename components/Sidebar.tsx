@@ -99,7 +99,7 @@ export default function Sidebar({
               </div>
               <div>
                 <h1 className="text-white font-bold text-lg">Admin Panel</h1>
-                <p className="text-gray-400 text-xs">Top-Up System</p>
+                <p className="text-gray-400 text-xs">Quick Smart</p>
               </div>
             </div>
           </div>

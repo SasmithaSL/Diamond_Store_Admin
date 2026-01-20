@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Admin Panel - Top-Up System',
+  title: 'Admin Panel - Quick Smart',
   description: 'Admin Dashboard for Digital Top-Up System',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 }
