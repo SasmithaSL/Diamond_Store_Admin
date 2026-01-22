@@ -18,6 +18,7 @@ interface Transaction {
   created_at: string;
   user_name: string | null;
   user_id_number: string | null;
+  user_email: string | null;
   user_nickname: string | null;
   admin_name: string | null;
 }
@@ -129,9 +130,13 @@ export default function TransactionsPage() {
         const query = searchQuery.trim();
         // Smart detection: 
         // - If it's a number and length <= 3 digits, likely a User ID (e.g., 1, 10, 100)
+        // - If it contains @, it's an email
         // - Otherwise (longer numbers or text), treat as ID Number (e.g., 1234567890)
         const numValue = parseInt(query);
-        if (!isNaN(numValue) && query.length <= 3 && numValue > 0 && numValue < 10000) {
+        if (query.includes('@')) {
+          // Contains @ = email
+          params.email = query;
+        } else if (!isNaN(numValue) && query.length <= 3 && numValue > 0 && numValue < 10000) {
           // Short number (1-3 digits) = likely User ID
           params.userId = numValue;
         } else {

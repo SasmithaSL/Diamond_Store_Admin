@@ -13,6 +13,8 @@ interface UserDetails {
   id: number;
   name: string;
   nickname: string | null;
+  phone_number: string | null;
+  email: string | null;
   id_number: string;
   face_image: string | null;
   id_card_front: string | null;
@@ -276,10 +278,6 @@ export default function UserDetailsPage() {
                 </div>
                 <div className="p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase">Full Name</label>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">{user.name}</p>
-                    </div>
                     {user.nickname && (
                       <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase">Nickname</label>
@@ -287,16 +285,67 @@ export default function UserDetailsPage() {
                       </div>
                     )}
                     <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase">ID Number</label>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">NIC/Passport num</label>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className="text-lg font-semibold text-gray-900 font-mono">{user.id_number}</p>
+                        <p className="text-lg font-semibold text-gray-900 font-mono break-all">{user.id_number}</p>
                         <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(user.id_number);
-                            showToast('ID Number copied to clipboard!', 'success');
+                          onClick={async () => {
+                            try {
+                              // For mobile, ensure we have proper permissions
+                              if (navigator.clipboard && navigator.clipboard.writeText) {
+                                await navigator.clipboard.writeText(user.id_number);
+                                showToast('NIC/Passport num copied to clipboard!', 'success');
+                              } else {
+                                throw new Error('Clipboard API not available');
+                              }
+                            } catch (err) {
+                              // Enhanced fallback for mobile browsers
+                              try {
+                                const textArea = document.createElement('textarea');
+                                textArea.value = user.id_number;
+                                textArea.style.position = 'fixed';
+                                textArea.style.top = '0';
+                                textArea.style.left = '0';
+                                textArea.style.width = '2em';
+                                textArea.style.height = '2em';
+                                textArea.style.padding = '0';
+                                textArea.style.border = 'none';
+                                textArea.style.outline = 'none';
+                                textArea.style.boxShadow = 'none';
+                                textArea.style.background = 'transparent';
+                                textArea.setAttribute('readonly', '');
+                                textArea.setAttribute('aria-hidden', 'true');
+                                document.body.appendChild(textArea);
+                                
+                                // For iOS
+                                if (navigator.userAgent.match(/ipad|iphone/i)) {
+                                  const range = document.createRange();
+                                  range.selectNodeContents(textArea);
+                                  const selection = window.getSelection();
+                                  if (selection) {
+                                    selection.removeAllRanges();
+                                    selection.addRange(range);
+                                  }
+                                  textArea.setSelectionRange(0, 999999);
+                                } else {
+                                  textArea.select();
+                                }
+                                
+                                const successful = document.execCommand('copy');
+                                document.body.removeChild(textArea);
+                                
+                                if (successful) {
+                                  showToast('NIC/Passport num copied to clipboard!', 'success');
+                                } else {
+                                  throw new Error('Copy command failed');
+                                }
+                              } catch (fallbackErr) {
+                                showToast('Failed to copy. Please select and copy manually.', 'error');
+                              }
+                            }
                           }}
-                          className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition"
-                          title="Copy ID Number"
+                          className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded transition flex-shrink-0 touch-manipulation"
+                          title="Copy NIC/Passport num"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -304,6 +353,16 @@ export default function UserDetailsPage() {
                         </button>
                       </div>
                     </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Phone Number</label>
+                      <p className="text-lg font-semibold text-gray-900 mt-1">{user.phone_number || user.name || 'N/A'}</p>
+                    </div>
+                    {user.email && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase">Email</label>
+                        <p className="text-lg font-semibold text-gray-900 mt-1">{user.email}</p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">User ID</label>
                       <p className="text-lg font-semibold text-gray-900 mt-1">#{user.id}</p>
@@ -334,17 +393,17 @@ export default function UserDetailsPage() {
               {(user.id_card_front || user.id_card_back) && (
                 <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
                   <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-900">ID Card Documents</h2>
+                    <h2 className="text-xl font-bold text-gray-900">NIC / Passport Documents</h2>
                   </div>
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {user.id_card_front && (
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase">ID Card Front</label>
+                            <label className="text-xs font-semibold text-gray-500 uppercase">NIC / Passport Front</label>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => viewImage(user.id_card_front, 'ID Card Front')}
+                                onClick={() => viewImage(user.id_card_front, 'NIC / Passport Front')}
                                 className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition flex items-center gap-1.5 shadow-sm"
                                 title="View ID Card Front"
                               >
@@ -385,10 +444,10 @@ export default function UserDetailsPage() {
                       {user.id_card_back && (
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase">ID Card Back</label>
+                            <label className="text-xs font-semibold text-gray-500 uppercase">NIC / Passport Back</label>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => viewImage(user.id_card_back, 'ID Card Back')}
+                                onClick={() => viewImage(user.id_card_back, 'NIC / Passport Back')}
                                 className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition flex items-center gap-1.5 shadow-sm"
                                 title="View ID Card Back"
                               >

@@ -20,6 +20,7 @@ interface UserBreakdown {
   name: string;
   nickname: string | null;
   id_number: string;
+  email: string | null;
   order_count: number;
   user_sales: number;
   user_reward: number;
@@ -67,6 +68,7 @@ export default function ReportsPage() {
             user.name?.toLowerCase().includes(search) ||
             user.nickname?.toLowerCase().includes(search) ||
             user.id_number?.toLowerCase().includes(search) ||
+            (user.email && user.email.toLowerCase().includes(search)) ||
             user.user_id.toString().includes(search)
         );
         setFilteredUsers(filtered);
