@@ -121,6 +121,7 @@ export default function AdminDashboardPage() {
         pendingUsers: pendingRes.data.users?.length || 0,
         approvedUsers: approvedRes.data.users?.length || 0,
         pendingOrders: ordersRes.data.orders?.length || 0,
+        pointRequests: 0,
       });
     } catch (err: any) {
       console.error("Failed to fetch data:", err);
