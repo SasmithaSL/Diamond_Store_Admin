@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
-import { removeToken, isAuthenticated } from "@/lib/auth";
+import { getToken, removeToken, isAuthenticated } from "@/lib/auth";
 import { getImageUrl, handleImageError } from "@/lib/imageUtils";
 import Sidebar from "@/components/Sidebar";
 import Toast from "@/components/Toast";
@@ -60,10 +60,11 @@ export default function AdminDashboardPage() {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<ApprovedUser[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [rejectedOrders, setRejectedOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"pending" | "users" | "orders">(
-    "orders"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "pending" | "users" | "orders" | "rejected"
+  >("orders");
   const [showAddPoints, setShowAddPoints] = useState<number | null>(null);
   const [pointsAmount, setPointsAmount] = useState("");
   const [pointsDescription, setPointsDescription] = useState("");
@@ -73,8 +74,12 @@ export default function AdminDashboardPage() {
     pendingUsers: 0,
     approvedUsers: 0,
     pendingOrders: 0,
+    rejectedOrders: 0,
     pointRequests: 0,
   });
+  const lastOrderIdsRef = useRef<Set<number>>(new Set());
+  const hasLoadedOrdersRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -87,8 +92,9 @@ export default function AdminDashboardPage() {
       | "pending"
       | "users"
       | "orders"
+      | "rejected"
       | null;
-    if (tab && ["pending", "users", "orders"].includes(tab)) {
+    if (tab && ["pending", "users", "orders", "rejected"].includes(tab)) {
       setActiveTab(tab);
     } else {
       // Default to orders if no tab specified
@@ -105,22 +111,122 @@ export default function AdminDashboardPage() {
     setToast({ message, type });
   };
 
+  const getOrderStatus = (order: Order) =>
+    (order.status || "").toUpperCase().trim();
+
+  const playNotificationSound = async () => {
+    if (typeof window === "undefined") return;
+    try {
+      const AudioCtx =
+        window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+      const audioContext = audioContextRef.current;
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(
+        0.2,
+        audioContext.currentTime + 0.02
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        audioContext.currentTime + 0.2
+      );
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.22);
+    } catch (err) {
+      console.warn("Notification sound failed:", err);
+    }
+  };
+
+  const showSystemNotification = async (newCount: number) => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    try {
+      if (Notification.permission === "default") {
+        await Notification.requestPermission();
+      }
+      if (Notification.permission !== "granted") return;
+      const title =
+        newCount === 1 ? "New order received" : "New orders received";
+      const body =
+        newCount === 1
+          ? "A new order is waiting for approval."
+          : `${newCount} new orders are waiting for approval.`;
+      new Notification(title, { body });
+    } catch (err) {
+      console.warn("System notification failed:", err);
+    }
+  };
+
+  const applyPendingOrders = (orders: Order[], notify: boolean) => {
+    setPendingOrders(orders);
+    setStats((prev) => ({ ...prev, pendingOrders: orders.length }));
+
+    const currentIds = new Set(orders.map((order) => order.id));
+    if (!hasLoadedOrdersRef.current) {
+      lastOrderIdsRef.current = currentIds;
+      hasLoadedOrdersRef.current = true;
+      return;
+    }
+
+    if (notify) {
+      let newCount = 0;
+      currentIds.forEach((id) => {
+        if (!lastOrderIdsRef.current.has(id)) {
+          newCount += 1;
+        }
+      });
+
+      if (newCount > 0) {
+        showToast(
+          newCount === 1
+            ? "New order received"
+            : `New orders received (${newCount})`,
+          "info"
+        );
+        playNotificationSound();
+        showSystemNotification(newCount);
+      }
+    }
+
+    lastOrderIdsRef.current = currentIds;
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pendingRes, approvedRes, ordersRes] = await Promise.all([
+      const [pendingRes, approvedRes, ordersRes, rejectedRes] =
+        await Promise.all([
         api.get("/users/pending"),
         api.get("/users/approved"),
         api.get("/orders/pending"),
+        api.get("/orders/rejected"),
       ]);
       setPendingUsers(pendingRes.data.users || []);
       setApprovedUsers(approvedRes.data.users || []);
-      setPendingOrders(ordersRes.data.orders || []);
+      applyPendingOrders(ordersRes.data.orders || [], false);
+      const rejectedOnly = (rejectedRes.data.orders || []).filter(
+        (order: Order) => getOrderStatus(order) === "REJECTED"
+      );
+      setRejectedOrders(rejectedOnly);
 
       setStats({
         pendingUsers: pendingRes.data.users?.length || 0,
         approvedUsers: approvedRes.data.users?.length || 0,
         pendingOrders: ordersRes.data.orders?.length || 0,
+        rejectedOrders: rejectedRes.data.orders?.length || 0,
         pointRequests: 0,
       });
     } catch (err: any) {
@@ -130,6 +236,72 @@ export default function AdminDashboardPage() {
       setLoading(false);
     }
   };
+
+  const refreshPendingOrders = async (notify: boolean) => {
+    try {
+      const ordersRes = await api.get("/orders/pending");
+      applyPendingOrders(ordersRes.data.orders || [], notify);
+    } catch (err: any) {
+      console.error("Refresh orders failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    if (typeof window === "undefined") return;
+
+    const rawBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+    const baseUrl =
+      window.location.protocol === "https:" &&
+      rawBaseUrl.startsWith("http://")
+        ? rawBaseUrl.replace("http://", "https://")
+        : rawBaseUrl;
+    const token = getToken();
+    if (!token) return;
+    const streamUrl = `${baseUrl}/orders/pending-stream?token=${encodeURIComponent(
+      token
+    )}`;
+
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+
+    const handleNewOrder = async (event: MessageEvent) => {
+      try {
+        JSON.parse(event.data || "{}");
+      } catch (err) {
+        console.error("Invalid SSE order payload:", err);
+      }
+      await refreshPendingOrders(true);
+    };
+
+    const connect = () => {
+      if (closed) return;
+      eventSource = new EventSource(streamUrl);
+      eventSource.addEventListener("new-order", handleNewOrder);
+      eventSource.onerror = () => {
+        if (closed) return;
+        eventSource?.close();
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connect();
+          }, 10000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      closed = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      eventSource?.close();
+    };
+  }, []);
 
   const handleApproveUser = async (userId: number) => {
     try {
@@ -242,25 +414,45 @@ export default function AdminDashboardPage() {
       (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredOrders = pendingOrders.filter(
-    (order) =>
-      order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredOrders = pendingOrders.filter((order) => {
+    if (getOrderStatus(order) !== "PENDING") return false;
+    const query = searchQuery.toLowerCase();
+    return (
+      order.order_number.toLowerCase().includes(query) ||
       (order.parent_user_name &&
-        order.parent_user_name
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())) ||
+        order.parent_user_name.toLowerCase().includes(query)) ||
       (order.parent_user_id_number &&
-        order.parent_user_id_number
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())) ||
-      (order.parent_user_email &&
-        order.parent_user_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (order.client_imo_id &&
-        order.client_imo_id.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+        order.parent_user_id_number.toLowerCase().includes(query)) ||
+      (order.parent_user_email && order.parent_user_email.toLowerCase().includes(query)) ||
+      (order.client_imo_id && order.client_imo_id.toLowerCase().includes(query))
+    );
+  });
+
+  const filteredRejectedOrders = rejectedOrders.filter((order) => {
+    if (getOrderStatus(order) !== "REJECTED") return false;
+    const query = searchQuery.toLowerCase();
+    return (
+      order.order_number.toLowerCase().includes(query) ||
+      (order.parent_user_name &&
+        order.parent_user_name.toLowerCase().includes(query)) ||
+      (order.parent_user_id_number &&
+        order.parent_user_id_number.toLowerCase().includes(query)) ||
+      (order.parent_user_email && order.parent_user_email.toLowerCase().includes(query)) ||
+      (order.client_imo_id && order.client_imo_id.toLowerCase().includes(query))
+    );
+  });
 
   // Group orders by user_id to identify same user orders
   const ordersByUser = filteredOrders.reduce((acc, order) => {
+    const userId = order.user_id;
+    if (!acc[userId]) {
+      acc[userId] = [];
+    }
+    acc[userId].push(order);
+    return acc;
+  }, {} as Record<number, Order[]>);
+
+  const rejectedOrdersByUser = filteredRejectedOrders.reduce((acc, order) => {
     const userId = order.user_id;
     if (!acc[userId]) {
       acc[userId] = [];
@@ -410,6 +602,23 @@ export default function AdminDashboardPage() {
                 </span>
                 <span className="block sm:hidden text-xs font-normal">
                   ({stats.pendingOrders})
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("rejected")}
+                className={`flex-1 min-w-[100px] sm:min-w-[120px] px-2 sm:px-4 py-3 sm:py-4 text-center font-semibold transition text-xs sm:text-sm whitespace-nowrap touch-manipulation ${
+                  activeTab === "rejected"
+                    ? "text-primary-600 border-b-2 border-primary-600 bg-primary-50"
+                    : "text-gray-600 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-100"
+                }`}
+              >
+                <span className="block sm:inline">Rejected</span>
+                <span className="hidden sm:inline">
+                  {" "}
+                  ({stats.rejectedOrders})
+                </span>
+                <span className="block sm:hidden text-xs font-normal">
+                  ({stats.rejectedOrders})
                 </span>
               </button>
               <button
@@ -1330,6 +1539,33 @@ export default function AdminDashboardPage() {
                                   {order.customer_name}
                                 </p>
                               )}
+                              {order.client_profile_photo && (
+                                <div className="mt-2">
+                                  <p className="text-xs sm:text-sm text-gray-600 mb-1">
+                                    <strong>Profile Photo:</strong>
+                                  </p>
+                                  <img
+                                    src={
+                                      getImageUrl(order.client_profile_photo) ||
+                                      ""
+                                    }
+                                    alt="IMO Profile Photo"
+                                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover border border-gray-300"
+                                    onError={(e) =>
+                                      handleImageError(
+                                        e,
+                                        order.client_profile_photo
+                                      )
+                                    }
+                                  />
+                                </div>
+                              )}
+                              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                                <strong>Total Diamonds:</strong>{" "}
+                                <span className="ml-1 inline-flex items-center rounded-md bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-800 border border-yellow-200">
+                                  {order.quantity * order.diamond_amount}
+                                </span>
+                              </p>
                               {order.client_imo_id && (
                                 <div className="text-xs sm:text-sm text-gray-600 mt-1 flex flex-wrap items-center gap-2">
                                   <strong>IMO ID:</strong>
@@ -1420,32 +1656,6 @@ export default function AdminDashboardPage() {
                                   </button>
                                 </div>
                               )}
-                              {order.client_profile_photo && (
-                                <div className="mt-2">
-                                  <p className="text-xs sm:text-sm text-gray-600 mb-1">
-                                    <strong>Profile Photo:</strong>
-                                  </p>
-                                  <img
-                                    src={
-                                      getImageUrl(order.client_profile_photo) ||
-                                      ""
-                                    }
-                                    alt="IMO Profile Photo"
-                                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover border border-gray-300"
-                                    onError={(e) =>
-                                      handleImageError(
-                                        e,
-                                        order.client_profile_photo
-                                      )
-                                    }
-                                  />
-                                </div>
-                              )}
-                              <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                                <strong>Diamonds:</strong> {order.quantity}x{" "}
-                                {order.diamond_amount} ={" "}
-                                {order.quantity * order.diamond_amount} total
-                              </p>
                               <p className="text-xs text-gray-500 mt-2">
                                 {new Date(order.created_at).toLocaleDateString(
                                   "en-US",
@@ -1502,6 +1712,151 @@ export default function AdminDashboardPage() {
                                 </svg>
                                 Complete
                               </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Rejected Orders Tab */}
+          {activeTab === "rejected" && (
+            <div className="space-y-4 sm:space-y-6">
+              {filteredRejectedOrders.length === 0 ? (
+                <div className="bg-white rounded-lg shadow-md p-8 sm:p-12 text-center">
+                  <svg
+                    className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-400 mb-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
+                  </svg>
+                  <p className="text-gray-500 text-base sm:text-lg font-medium">
+                    {searchQuery
+                      ? "No orders found matching your search"
+                      : "No rejected orders"}
+                  </p>
+                </div>
+              ) : (
+                Object.entries(rejectedOrdersByUser).map(([userId, userOrders]) => {
+                  const isMultipleOrders = userOrders.length > 1;
+                  return (
+                    <div key={userId} className="space-y-3 sm:space-y-4">
+                      {isMultipleOrders && (
+                        <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-3 sm:p-4 mb-2">
+                          <div className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 flex-shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                              />
+                            </svg>
+                            <p className="text-xs sm:text-sm font-semibold text-red-800">
+                              {userOrders.length}{" "}
+                              {userOrders.length === 1 ? "Order" : "Orders"}{" "}
+                              from{" "}
+                              {userOrders[0].parent_user_name ||
+                                `User ID: ${userId}`}{" "}
+                              {userOrders[0].parent_user_id_number &&
+                                `(${userOrders[0].parent_user_id_number})`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {userOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          className={`bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition ${
+                            isMultipleOrders ? "border-l-4 border-red-400" : ""
+                          }`}
+                        >
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-800 break-words">
+                                Order #{order.order_number}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
+                                <strong>Requester:</strong>{" "}
+                                {order.parent_user_name ||
+                                  `User ID: ${order.user_id}`}{" "}
+                                {order.parent_user_id_number &&
+                                  `(${order.parent_user_id_number})`}
+                              </p>
+                              {order.customer_name && (
+                                <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
+                                  <strong>Customer:</strong>{" "}
+                                  {order.customer_name}
+                                </p>
+                              )}
+                              {order.client_profile_photo && (
+                                <div className="mt-2">
+                                  <p className="text-xs sm:text-sm text-gray-600 mb-1">
+                                    <strong>Profile Photo:</strong>
+                                  </p>
+                                  <img
+                                    src={
+                                      getImageUrl(order.client_profile_photo) ||
+                                      ""
+                                    }
+                                    alt="IMO Profile Photo"
+                                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover border border-gray-300"
+                                    onError={(e) =>
+                                      handleImageError(
+                                        e,
+                                        order.client_profile_photo
+                                      )
+                                    }
+                                  />
+                                </div>
+                              )}
+                              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                                <strong>Total Diamonds:</strong>{" "}
+                                <span className="ml-1 inline-flex items-center rounded-md bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-800 border border-yellow-200">
+                                  {order.quantity * order.diamond_amount}
+                                </span>
+                              </p>
+                              {order.client_imo_id && (
+                                <div className="text-xs sm:text-sm text-gray-600 mt-1 flex flex-wrap items-center gap-2">
+                                  <strong>IMO ID:</strong>
+                                  <span className="font-mono break-all">
+                                    {order.client_imo_id}
+                                  </span>
+                                </div>
+                              )}
+                              <p className="text-xs text-gray-500 mt-2">
+                                {new Date(order.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex items-center w-full md:w-auto">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                                Rejected
+                              </span>
                             </div>
                           </div>
                         </div>

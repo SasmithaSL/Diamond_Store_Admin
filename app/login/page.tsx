@@ -103,11 +103,6 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              Default: ID: ADMIN001, Password: admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>
