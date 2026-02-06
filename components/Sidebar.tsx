@@ -86,20 +86,24 @@ export default function Sidebar({
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-gray-900 to-gray-800 shadow-xl border-r border-gray-700 z-40 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 h-screen w-64 bg-white dark:bg-gradient-to-b dark:from-gray-900 dark:to-gray-800 shadow-xl border-r border-gray-200 dark:border-gray-700 z-40 transform transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-6 border-b border-gray-700">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-white text-xl font-bold">A</span>
               </div>
               <div>
-                <h1 className="text-white font-bold text-lg">Admin Panel</h1>
-                <p className="text-gray-400 text-xs">Quick Smart</p>
+                <h1 className="text-gray-900 dark:text-white font-bold text-lg">
+                  Admin Panel
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400 text-xs">
+                  Quick Smart
+                </p>
               </div>
             </div>
           </div>
@@ -114,7 +118,7 @@ export default function Sidebar({
                 className={`flex items-center gap-3 px-6 py-3 mx-2 mb-1 rounded-lg transition text-sm ${
                   isActive(item.href)
                     ? "bg-primary-600 text-white font-semibold shadow-lg"
-                    : "text-gray-300 hover:bg-gray-700 hover:text-white"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                 }`}
               >
                 <span className="text-lg">{item.icon}</span>
@@ -124,10 +128,10 @@ export default function Sidebar({
           </nav>
 
           {/* Logout Button */}
-          <div className="p-4 border-t border-gray-700">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={handleLogout}
-              className="w-full px-6 py-3 text-sm text-red-400 hover:bg-red-900 hover:text-red-300 rounded-lg transition font-medium flex items-center gap-2 justify-center"
+              className="w-full px-6 py-3 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900 dark:hover:text-red-300 rounded-lg transition font-medium flex items-center gap-2 justify-center"
             >
               <span>🚪</span>
               <span>Logout</span>

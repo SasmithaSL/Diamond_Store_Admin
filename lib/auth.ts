@@ -1,7 +1,16 @@
 import Cookies from 'js-cookie';
 
 export const setToken = (token: string) => {
-  Cookies.set('token', token, { expires: 7 });
+  const isSecure =
+    typeof window !== "undefined"
+      ? window.location.protocol === "https:"
+      : process.env.NODE_ENV === "production";
+  Cookies.set("token", token, {
+    expires: 7,
+    secure: isSecure,
+    sameSite: "lax",
+    path: "/",
+  });
 };
 
 export const getToken = (): string | undefined => {

@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
-import { getToken, removeToken, isAuthenticated } from "@/lib/auth";
+import { removeToken, isAuthenticated } from "@/lib/auth";
 import { getImageUrl, handleImageError } from "@/lib/imageUtils";
 import Sidebar from "@/components/Sidebar";
 import Toast from "@/components/Toast";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface PendingUser {
   id: number;
@@ -258,11 +259,7 @@ export default function AdminDashboardPage() {
       window.location.protocol === "https:" && rawBaseUrl.startsWith("http://")
         ? rawBaseUrl.replace("http://", "https://")
         : rawBaseUrl;
-    const token = getToken();
-    if (!token) return;
-    const streamUrl = `${baseUrl}/orders/pending-stream?token=${encodeURIComponent(
-      token,
-    )}`;
+    const streamUrl = `${baseUrl}/orders/pending-stream`;
 
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -279,7 +276,7 @@ export default function AdminDashboardPage() {
 
     const connect = () => {
       if (closed) return;
-      eventSource = new EventSource(streamUrl);
+      eventSource = new EventSource(streamUrl, { withCredentials: true });
       eventSource.addEventListener("new-order", handleNewOrder);
       eventSource.onerror = () => {
         if (closed) return;
@@ -518,6 +515,7 @@ export default function AdminDashboardPage() {
                 </h1>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                <ThemeToggle />
                 <button
                   onClick={fetchData}
                   disabled={loading}
@@ -1194,10 +1192,10 @@ export default function AdminDashboardPage() {
 
                           {/* Add Points Form - Mobile */}
                           {showAddPoints === user.id && (
-                            <div className="md:hidden p-4 bg-blue-50 border-l-4 border-blue-500 mt-3 rounded-lg">
+                            <div className="md:hidden p-4 bg-blue-50 dark:bg-slate-900/70 border-l-4 border-blue-500 dark:border-blue-400 mt-3 rounded-lg">
                               <div className="grid grid-cols-1 gap-4 mb-4">
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Amount
                                   </label>
                                   <input
@@ -1211,7 +1209,7 @@ export default function AdminDashboardPage() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Description (Optional)
                                   </label>
                                   <input
@@ -1251,7 +1249,7 @@ export default function AdminDashboardPage() {
                                     setPointsAmount("");
                                     setPointsDescription("");
                                   }}
-                                  className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 active:bg-gray-400 font-semibold text-sm sm:text-base transition touch-manipulation"
+                                  className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation"
                                 >
                                   Cancel
                                 </button>
@@ -1393,10 +1391,10 @@ export default function AdminDashboardPage() {
 
                           {/* Add Points Form - Desktop */}
                           {showAddPoints === user.id && (
-                            <div className="hidden md:block col-span-12 px-4 lg:px-6 py-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg mt-2">
+                            <div className="hidden md:block col-span-12 px-4 lg:px-6 py-4 bg-blue-50 dark:bg-slate-900/70 border-l-4 border-blue-500 dark:border-blue-400 rounded-lg mt-2">
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Amount
                                   </label>
                                   <input
@@ -1410,7 +1408,7 @@ export default function AdminDashboardPage() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Description (Optional)
                                   </label>
                                   <input
@@ -1450,7 +1448,7 @@ export default function AdminDashboardPage() {
                                     setPointsAmount("");
                                     setPointsDescription("");
                                   }}
-                                  className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 active:bg-gray-400 font-semibold text-sm sm:text-base transition touch-manipulation"
+                                  className="flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 bg-gray-200 text-gray-700 hover:bg-gray-300 active:bg-gray-400 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation"
                                 >
                                   Cancel
                                 </button>
