@@ -36,6 +36,8 @@ export default function TransactionsPage() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -189,6 +191,12 @@ export default function TransactionsPage() {
       default:
         return '💎';
     }
+  };
+
+  const formatDateTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
   };
 
   if (loading && transactions.length === 0) {
@@ -380,6 +388,9 @@ export default function TransactionsPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Admin
                       </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Receipt
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -482,6 +493,45 @@ export default function TransactionsPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                             {transaction.admin_name || '-'}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <button
+                              onClick={() => {
+                                setSelectedTransaction(transaction);
+                                setShowReceiptModal(true);
+                              }}
+                              disabled={transaction.transaction_type !== 'ADDED'}
+                              title={
+                                transaction.transaction_type === 'ADDED'
+                                  ? 'View receipt'
+                                  : 'Receipt available for ADDED only'
+                              }
+                              className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition ${
+                                transaction.transaction_type === 'ADDED'
+                                  ? 'bg-white text-primary-600 border-primary-200 hover:bg-primary-50'
+                                  : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                              }`}
+                            >
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                              </svg>
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -500,6 +550,112 @@ export default function TransactionsPage() {
           type={toast.type}
           onClose={() => setToast(null)}
         />
+      )}
+
+      {/* Receipt Modal */}
+      {showReceiptModal && selectedTransaction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Receipt</h3>
+              <button
+                onClick={() => {
+                  setShowReceiptModal(false);
+                  setSelectedTransaction(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <svg
+                  className="w-5 h-5 text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-primary-600 flex items-center justify-center mb-3">
+                <svg
+                  className="w-10 h-10 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Success</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Receiver</p>
+                <p className="text-base font-semibold text-gray-800">
+                  {selectedTransaction.user_nickname ||
+                    selectedTransaction.user_name ||
+                    `User #${selectedTransaction.user_id}`}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Time</p>
+                <p className="text-base font-semibold text-gray-800">
+                  {formatDateTime(selectedTransaction.created_at)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Diamond Amount</p>
+                <div className="flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5 text-black"
+                    fill="currentColor"
+                    viewBox="0 0 16 16"
+                  >
+                    <path d="M3.1.7a.5.5 0 0 1 .4-.2h9a.5.5 0 0 1 .4.2l2.976 3.974c.149.185.156.45.01.644L8.4 15.3a.5.5 0 0 1-.8 0L.1 5.3a.5.5 0 0 1 0-.6zm11.386 3.785-1.806-2.41-.776 2.413zm-3.633.004.961-2.989H4.186l.963 2.995zM5.47 5.495 8 13.366l2.532-7.876zm-1.371-.999-.78-2.422-1.818 2.425zM1.499 5.5l5.113 6.817-2.192-6.82zm7.889 6.817 5.123-6.83-2.928.002z" />
+                  </svg>
+                  <p className="text-base font-semibold text-gray-800">
+                    {Math.round(selectedTransaction.amount * 100) / 100}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Status</p>
+                <p className="text-base font-semibold text-green-700">SUCCESS</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Description</p>
+                <p className="text-base font-semibold text-gray-800">
+                  {selectedTransaction.description || '-'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowReceiptModal(false);
+                  setSelectedTransaction(null);
+                }}
+                className="w-full px-4 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 active:bg-primary-800 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
