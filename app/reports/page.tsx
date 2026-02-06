@@ -13,6 +13,7 @@ interface WeeklySummary {
   total_orders: number;
   total_sales: number;
   total_rewards: number;
+  total_admin_points: number;
 }
 
 interface UserBreakdown {
@@ -24,6 +25,7 @@ interface UserBreakdown {
   order_count: number;
   user_sales: number;
   user_reward: number;
+  admin_added_points: number;
 }
 
 interface WeeklyReport {
@@ -67,7 +69,6 @@ export default function ReportsPage() {
           (user) =>
             user.name?.toLowerCase().includes(search) ||
             user.nickname?.toLowerCase().includes(search) ||
-            user.id_number?.toLowerCase().includes(search) ||
             (user.email && user.email.toLowerCase().includes(search)) ||
             user.user_id.toString().includes(search)
         );
@@ -242,7 +243,7 @@ export default function ReportsPage() {
                   type="text"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Search by name, ID number, or user ID..."
+                  placeholder="Search by name, email, or user ID..."
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
                 />
               </div>
@@ -358,16 +359,22 @@ export default function ReportsPage() {
                               >
                                 {user.nickname || user.name}
                               </Link>
-                              <p className="text-xs text-gray-500 mt-1">
-                                ID: {user.id_number}
+                              <p className="text-xs text-gray-500 mt-1 truncate">
+                                {user.email || "No email"}
                               </p>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <p className="text-gray-600">Orders</p>
+                              <p className="text-gray-600">Completed Orders</p>
                               <p className="font-semibold text-gray-900">
                                 {user.order_count}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Admin Points</p>
+                              <p className="font-semibold text-gray-900">
+                                {formatCurrency(user.admin_added_points)}
                               </p>
                             </div>
                             <div>
@@ -376,7 +383,7 @@ export default function ReportsPage() {
                                 {formatCurrency(user.user_sales)}
                               </p>
                             </div>
-                            <div className="col-span-2">
+                            <div>
                               <p className="text-gray-600">Reward</p>
                               <p className="font-semibold text-green-600">
                                 {formatCurrency(user.user_reward)}
@@ -396,10 +403,13 @@ export default function ReportsPage() {
                               User
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                              ID Number
+                              Email
                             </th>
                             <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                              Orders
+                              Completed Orders
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              Admin Added Points
                             </th>
                             <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                               Sales
@@ -424,13 +434,18 @@ export default function ReportsPage() {
                                 </Link>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="text-sm text-gray-600 font-mono">
-                                  {user.id_number}
+                                <span className="text-sm text-gray-600">
+                                  {user.email || "No email"}
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right">
                                 <span className="text-sm font-semibold text-gray-900">
                                   {user.order_count}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right">
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {formatCurrency(user.admin_added_points)}
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right">
