@@ -240,66 +240,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const refreshPendingOrders = async (notify: boolean) => {
-    try {
-      const ordersRes = await api.get("/orders/pending");
-      applyPendingOrders(ordersRes.data.orders || [], notify);
-    } catch (err: any) {
-      console.error("Refresh orders failed:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated()) return;
-    if (typeof window === "undefined") return;
-
-    const rawBaseUrl =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-    const baseUrl =
-      window.location.protocol === "https:" && rawBaseUrl.startsWith("http://")
-        ? rawBaseUrl.replace("http://", "https://")
-        : rawBaseUrl;
-    const streamUrl = `${baseUrl}/orders/pending-stream`;
-
-    let eventSource: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let closed = false;
-
-    const handleNewOrder = async (event: MessageEvent) => {
-      try {
-        JSON.parse(event.data || "{}");
-      } catch (err) {
-        console.error("Invalid SSE order payload:", err);
-      }
-      await refreshPendingOrders(true);
-    };
-
-    const connect = () => {
-      if (closed) return;
-      eventSource = new EventSource(streamUrl, { withCredentials: true });
-      eventSource.addEventListener("new-order", handleNewOrder);
-      eventSource.onerror = () => {
-        if (closed) return;
-        eventSource?.close();
-        if (!reconnectTimer) {
-          reconnectTimer = setTimeout(() => {
-            reconnectTimer = null;
-            connect();
-          }, 10000);
-        }
-      };
-    };
-
-    connect();
-
-    return () => {
-      closed = true;
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      eventSource?.close();
-    };
-  }, []);
 
   const handleApproveUser = async (userId: number) => {
     try {
@@ -370,20 +310,6 @@ export default function AdminDashboardPage() {
       showToast(`Order ${status.toLowerCase()} successfully!`, "success");
       fetchData();
 
-      // Trigger immediate refresh in transactions page (if open)
-      // Use localStorage event for cross-tab communication
-      localStorage.setItem("transactionUpdated", Date.now().toString());
-      localStorage.removeItem("transactionUpdated");
-
-      // Also dispatch custom event for same-tab communication
-      window.dispatchEvent(new Event("transactionUpdated"));
-
-      // Small delay to ensure backend has processed the reward
-      setTimeout(() => {
-        window.dispatchEvent(new Event("transactionUpdated"));
-        localStorage.setItem("transactionUpdated", Date.now().toString());
-        localStorage.removeItem("transactionUpdated");
-      }, 500);
     } catch (err: any) {
       showToast(
         err.response?.data?.error || "Failed to update order status",

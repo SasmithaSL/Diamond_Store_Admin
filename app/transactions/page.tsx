@@ -35,7 +35,6 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [autoRefreshing, setAutoRefreshing] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
 
@@ -47,77 +46,6 @@ export default function TransactionsPage() {
     fetchTransactions();
   }, [router]);
 
-  // Auto-refresh transactions every 2 seconds to catch new rewards/transactions immediately
-  useEffect(() => {
-    if (!isAuthenticated()) return;
-
-    const interval = setInterval(async () => {
-      setAutoRefreshing(true);
-      try {
-        const params: any = { limit: 500 };
-        
-        if (searchQuery.trim()) {
-          const query = searchQuery.trim();
-          const numValue = parseInt(query);
-          if (!isNaN(numValue) && query.length <= 3 && numValue > 0 && numValue < 10000) {
-            params.userId = numValue;
-          } else {
-            params.idNumber = query;
-          }
-        }
-        
-        const queryString = new URLSearchParams(params).toString();
-        const response = await api.get(`/users/transactions/all?${queryString}`);
-        setTransactions(response.data.transactions || []);
-      } catch (err: any) {
-        console.error('Auto-refresh failed:', err);
-      } finally {
-        setAutoRefreshing(false);
-      }
-    }, 2000); // Refresh every 2 seconds for immediate updates
-
-    return () => clearInterval(interval);
-  }, [searchQuery]); // Re-run if search query changes
-
-  // Refresh when page becomes visible (e.g., admin approves order in another tab)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated()) {
-        fetchTransactions();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
-
-  // Listen for storage events to trigger immediate refresh when order is approved
-  useEffect(() => {
-    if (!isAuthenticated()) return;
-
-    const handleStorageChange = (e: StorageEvent) => {
-      // When order is approved, refresh transactions immediately
-      if (e.key === 'orderApproved' || e.key === 'transactionUpdated') {
-        fetchTransactions();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom events (for same-tab communication)
-    const handleCustomEvent = () => {
-      fetchTransactions();
-    };
-    
-    window.addEventListener('orderApproved', handleCustomEvent);
-    window.addEventListener('transactionUpdated', handleCustomEvent);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('orderApproved', handleCustomEvent);
-      window.removeEventListener('transactionUpdated', handleCustomEvent);
-    };
-  }, []);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -227,14 +155,6 @@ export default function TransactionsPage() {
                   </svg>
                 </button>
                 <h1 className="text-2xl font-bold text-gray-800">Transaction History</h1>
-                {autoRefreshing && (
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Auto-refreshing...
-                  </span>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
