@@ -87,6 +87,68 @@ export default function UserDetailsPage() {
     setToast({ message, type });
   };
 
+  const copyToClipboard = async (text: string, successMessage: string) => {
+    try {
+      // For mobile, ensure we have proper permissions
+      if (
+        navigator.clipboard &&
+        navigator.clipboard.writeText
+      ) {
+        await navigator.clipboard.writeText(text);
+        showToast(successMessage, "success");
+      } else {
+        throw new Error("Clipboard API not available");
+      }
+    } catch (err) {
+      // Enhanced fallback for mobile browsers
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.padding = "0";
+        textArea.style.border = "none";
+        textArea.style.outline = "none";
+        textArea.style.boxShadow = "none";
+        textArea.style.background = "transparent";
+        textArea.setAttribute("readonly", "");
+        textArea.setAttribute("aria-hidden", "true");
+        document.body.appendChild(textArea);
+
+        // For iOS
+        if (navigator.userAgent.match(/ipad|iphone/i)) {
+          const range = document.createRange();
+          range.selectNodeContents(textArea);
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          textArea.setSelectionRange(0, 999999);
+        } else {
+          textArea.select();
+        }
+
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+
+        if (successful) {
+          showToast(successMessage, "success");
+        } else {
+          throw new Error("Copy command failed");
+        }
+      } catch (fallbackErr) {
+        showToast(
+          "Failed to copy. Please select and copy manually.",
+          "error",
+        );
+      }
+    }
+  };
+
   const formatReceiptTime = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
@@ -444,76 +506,12 @@ export default function UserDetailsPage() {
                           {user.id_number}
                         </p>
                         <button
-                          onClick={async () => {
-                            try {
-                              // For mobile, ensure we have proper permissions
-                              if (
-                                navigator.clipboard &&
-                                navigator.clipboard.writeText
-                              ) {
-                                await navigator.clipboard.writeText(
-                                  user.id_number,
-                                );
-                                showToast(
-                                  "NIC/Passport num copied to clipboard!",
-                                  "success",
-                                );
-                              } else {
-                                throw new Error("Clipboard API not available");
-                              }
-                            } catch (err) {
-                              // Enhanced fallback for mobile browsers
-                              try {
-                                const textArea =
-                                  document.createElement("textarea");
-                                textArea.value = user.id_number;
-                                textArea.style.position = "fixed";
-                                textArea.style.top = "0";
-                                textArea.style.left = "0";
-                                textArea.style.width = "2em";
-                                textArea.style.height = "2em";
-                                textArea.style.padding = "0";
-                                textArea.style.border = "none";
-                                textArea.style.outline = "none";
-                                textArea.style.boxShadow = "none";
-                                textArea.style.background = "transparent";
-                                textArea.setAttribute("readonly", "");
-                                textArea.setAttribute("aria-hidden", "true");
-                                document.body.appendChild(textArea);
-
-                                // For iOS
-                                if (navigator.userAgent.match(/ipad|iphone/i)) {
-                                  const range = document.createRange();
-                                  range.selectNodeContents(textArea);
-                                  const selection = window.getSelection();
-                                  if (selection) {
-                                    selection.removeAllRanges();
-                                    selection.addRange(range);
-                                  }
-                                  textArea.setSelectionRange(0, 999999);
-                                } else {
-                                  textArea.select();
-                                }
-
-                                const successful = document.execCommand("copy");
-                                document.body.removeChild(textArea);
-
-                                if (successful) {
-                                  showToast(
-                                    "NIC/Passport num copied to clipboard!",
-                                    "success",
-                                  );
-                                } else {
-                                  throw new Error("Copy command failed");
-                                }
-                              } catch (fallbackErr) {
-                                showToast(
-                                  "Failed to copy. Please select and copy manually.",
-                                  "error",
-                                );
-                              }
-                            }
-                          }}
+                          onClick={() =>
+                            copyToClipboard(
+                              user.id_number,
+                              "NIC/Passport num copied to clipboard!",
+                            )
+                          }
                           className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded transition flex-shrink-0 touch-manipulation"
                           title="Copy NIC/Passport num"
                         >
@@ -537,18 +535,72 @@ export default function UserDetailsPage() {
                       <label className="text-xs font-semibold text-gray-500 uppercase">
                         Phone Number
                       </label>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">
-                        {user.phone_number || user.name || "N/A"}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-lg font-semibold text-gray-900 break-all">
+                          {user.phone_number || user.name || "N/A"}
+                        </p>
+                        {user.phone_number && (
+                          <button
+                            onClick={() =>
+                              copyToClipboard(
+                                user.phone_number || "",
+                                "Phone number copied to clipboard!",
+                              )
+                            }
+                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded transition flex-shrink-0 touch-manipulation"
+                            title="Copy Phone Number"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {user.email && (
                       <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase">
                           Email
                         </label>
-                        <p className="text-lg font-semibold text-gray-900 mt-1">
-                          {user.email}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-lg font-semibold text-gray-900 break-all">
+                            {user.email}
+                          </p>
+                          <button
+                            onClick={() =>
+                              copyToClipboard(
+                                user.email || "",
+                                "Email copied to clipboard!",
+                              )
+                            }
+                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded transition flex-shrink-0 touch-manipulation"
+                            title="Copy Email"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     )}
                     <div>
