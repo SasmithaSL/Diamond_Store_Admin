@@ -228,10 +228,17 @@ export default function AdminDashboardPage() {
       setRejectedOrders(rejectedOnly);
 
       // Calculate total diamond balance from all approved users
-      const totalDiamondBalance = approvedUsersData.reduce(
-        (sum: number, user: ApprovedUser) => sum + (user.points_balance || 0),
-        0
-      );
+      const totalDiamondBalance = Math.round(
+        approvedUsersData.reduce(
+          (sum: number, user: ApprovedUser) => {
+            const balance = typeof user.points_balance === 'number' 
+              ? user.points_balance 
+              : parseFloat(String(user.points_balance || 0)) || 0;
+            return sum + balance;
+          },
+          0
+        ) * 100
+      ) / 100; // Round to 2 decimal places
 
       setStats({
         pendingUsers: pendingRes.data.users?.length || 0,
