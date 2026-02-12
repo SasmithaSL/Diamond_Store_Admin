@@ -78,6 +78,7 @@ export default function AdminDashboardPage() {
     pendingOrders: 0,
     rejectedOrders: 0,
     pointRequests: 0,
+    totalDiamondBalance: 0,
   });
   const lastOrderIdsRef = useRef<Set<number>>(new Set());
   const hasLoadedOrdersRef = useRef(false);
@@ -218,19 +219,27 @@ export default function AdminDashboardPage() {
           api.get("/orders/rejected"),
         ]);
       setPendingUsers(pendingRes.data.users || []);
-      setApprovedUsers(approvedRes.data.users || []);
+      const approvedUsersData = approvedRes.data.users || [];
+      setApprovedUsers(approvedUsersData);
       applyPendingOrders(ordersRes.data.orders || [], false);
       const rejectedOnly = (rejectedRes.data.orders || []).filter(
         (order: Order) => getOrderStatus(order) === "REJECTED",
       );
       setRejectedOrders(rejectedOnly);
 
+      // Calculate total diamond balance from all approved users
+      const totalDiamondBalance = approvedUsersData.reduce(
+        (sum: number, user: ApprovedUser) => sum + (user.points_balance || 0),
+        0
+      );
+
       setStats({
         pendingUsers: pendingRes.data.users?.length || 0,
-        approvedUsers: approvedRes.data.users?.length || 0,
+        approvedUsers: approvedUsersData.length || 0,
         pendingOrders: ordersRes.data.orders?.length || 0,
         rejectedOrders: rejectedRes.data.orders?.length || 0,
         pointRequests: 0,
+        totalDiamondBalance: totalDiamondBalance,
       });
     } catch (err: any) {
       console.error("Failed to fetch data:", err);
@@ -471,7 +480,7 @@ export default function AdminDashboardPage() {
 
         <main className="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-yellow-500">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
@@ -502,7 +511,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500 sm:col-span-2 lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-gray-600">
@@ -514,6 +523,21 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="text-3xl sm:text-4xl flex-shrink-0 ml-2">
                   📦
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-purple-500">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-gray-600">
+                    Total Diamond Balance
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-800 mt-1 sm:mt-2">
+                    {stats.totalDiamondBalance.toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-3xl sm:text-4xl flex-shrink-0 ml-2">
+                  💎
                 </div>
               </div>
             </div>
