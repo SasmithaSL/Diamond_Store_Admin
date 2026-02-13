@@ -72,6 +72,15 @@ export default function AdminDashboardPage() {
   const [pointsDescription, setPointsDescription] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [previewData, setPreviewData] = useState<{
+    userId: number;
+    userName: string;
+    userNickname: string | null;
+    userEmail: string | null;
+    amount: number;
+    description: string;
+  } | null>(null);
   const [stats, setStats] = useState({
     pendingUsers: 0,
     approvedUsers: 0,
@@ -286,10 +295,32 @@ export default function AdminDashboardPage() {
     }
     const descriptionValue = pointsDescription || "Quick Store";
 
+    // Find the user to get current balance
+    const user = approvedUsers.find((u) => u.id === userId);
+    if (!user) {
+      showToast("User not found", "error");
+      return;
+    }
+
+    // Show confirmation modal with preview
+    setPreviewData({
+      userId,
+      userName: user.name,
+      userNickname: user.nickname,
+      userEmail: user.email,
+      amount,
+      description: descriptionValue,
+    });
+    setShowConfirmModal(true);
+  };
+
+  const confirmAddPoints = async () => {
+    if (!previewData) return;
+
     try {
-      const response = await api.post(`/users/${userId}/points`, {
-        amount: amount,
-        description: descriptionValue,
+      const response = await api.post(`/users/${previewData.userId}/points`, {
+        amount: previewData.amount,
+        description: previewData.description,
       });
 
       const updatedBalance = response.data?.user?.points_balance;
@@ -300,6 +331,9 @@ export default function AdminDashboardPage() {
 
       setPointsAmount("");
       setPointsDescription("");
+      setShowConfirmModal(false);
+      setPreviewData(null);
+      setShowAddPoints(null);
 
       await fetchData();
     } catch (err: any) {
@@ -1662,27 +1696,6 @@ export default function AdminDashboardPage() {
                             <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                               <button
                                 onClick={() =>
-                                  handleOrderStatus(order.id, "REJECTED")
-                                }
-                                className="flex-1 sm:flex-initial px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 active:bg-red-200 font-semibold text-sm transition flex items-center justify-center gap-2 border border-red-200 touch-manipulation"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                                Reject
-                              </button>
-                              <button
-                                onClick={() =>
                                   handleOrderStatus(order.id, "COMPLETED")
                                 }
                                 className="flex-1 sm:flex-initial px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 active:bg-green-200 font-semibold text-sm transition flex items-center justify-center gap-2 border border-green-200 touch-manipulation"
@@ -1701,6 +1714,27 @@ export default function AdminDashboardPage() {
                                   />
                                 </svg>
                                 Complete
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleOrderStatus(order.id, "REJECTED")
+                                }
+                                className="flex-1 sm:flex-initial px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 active:bg-red-200 font-semibold text-sm transition flex items-center justify-center gap-2 border border-red-200 touch-manipulation"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                                Reject
                               </button>
                             </div>
                           </div>
@@ -1863,6 +1897,73 @@ export default function AdminDashboardPage() {
           )}
         </main>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && previewData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Confirm Add Points
+            </h2>
+            
+            <div className="space-y-4 mb-6">
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">User</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {previewData.userNickname && previewData.userNickname !== previewData.userName
+                    ? `${previewData.userNickname} (${previewData.userName})`
+                    : previewData.userName}
+                </p>
+              </div>
+
+              <div className="border-b border-gray-200 dark:border-gray-700 pb-3">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {previewData.userEmail || "—"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Amount to Add</p>
+                <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                  {Number(previewData.amount).toLocaleString()} points
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPreviewData(null);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 rounded-lg font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAddPoints}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 rounded-lg font-semibold transition flex items-center justify-center gap-2"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                Confirm & Add Points
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (
