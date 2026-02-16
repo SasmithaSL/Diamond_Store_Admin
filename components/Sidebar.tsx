@@ -56,6 +56,7 @@ export default function Sidebar({
     { href: "/dashboard?tab=orders", label: "Orders", icon: "📦" },
     { href: "/transactions", label: "Transactions", icon: "💎" },
     { href: "/reports", label: "Weekly Reports", icon: "📈" },
+    { href: "/announcements", label: "Announcements", icon: "📢" },
   ];
 
   const handleLogout = () => {
@@ -68,10 +69,14 @@ export default function Sidebar({
     if (href === "/dashboard") {
       return pathname === "/dashboard" && !window.location.search;
     }
-    const tab = href.split("=")[1];
-    return (
-      pathname === "/dashboard" && window.location.search.includes(`tab=${tab}`)
-    );
+    if (href.startsWith("/dashboard?")) {
+      const tab = href.split("=")[1];
+      return (
+        pathname === "/dashboard" &&
+        window.location.search.includes(`tab=${tab}`)
+      );
+    }
+    return pathname === href;
   };
 
   return (
