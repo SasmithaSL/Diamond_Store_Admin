@@ -36,54 +36,76 @@ interface WeeklyReport {
   availableWeeks: Array<{ week_start: string }>;
 }
 
+interface DailySummary {
+  total_users: number;
+  total_orders: number;
+  total_sales: number;
+  total_admin_points: number;
+}
+
+interface DailyReport {
+  date: string;
+  summary: DailySummary;
+  userBreakdown: UserBreakdown[];
+  availableDates: Array<{ date: string }>;
+}
+
 interface ToastState {
   message: string;
   type: "success" | "error" | "info";
 }
 
+type ReportType = "weekly" | "daily";
+
 export default function ReportsPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [reportType, setReportType] = useState<ReportType>("weekly");
   const [report, setReport] = useState<WeeklyReport | null>(null);
+  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [userSearch, setUserSearch] = useState("");
   const [filteredUsers, setFilteredUsers] = useState<UserBreakdown[]>([]);
+
+  const currentBreakdown = reportType === "weekly" ? report?.userBreakdown : dailyReport?.userBreakdown;
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push("/login");
       return;
     }
-    fetchReport();
-  }, [router, selectedWeek]);
+    if (reportType === "weekly") {
+      fetchWeeklyReport();
+    } else {
+      fetchDailyReport();
+    }
+  }, [router, reportType, selectedWeek, selectedDate]);
 
   useEffect(() => {
-    if (report && report.userBreakdown) {
-      if (!userSearch.trim()) {
-        setFilteredUsers(report.userBreakdown);
-      } else {
-        const search = userSearch.toLowerCase().trim();
-        const filtered = report.userBreakdown.filter(
-          (user) =>
-            user.name?.toLowerCase().includes(search) ||
-            user.nickname?.toLowerCase().includes(search) ||
-            (user.email && user.email.toLowerCase().includes(search)) ||
-            user.user_id.toString().includes(search)
-        );
-        setFilteredUsers(filtered);
-      }
+    const breakdown = currentBreakdown || [];
+    if (!userSearch.trim()) {
+      setFilteredUsers(breakdown);
+    } else {
+      const search = userSearch.toLowerCase().trim();
+      const filtered = breakdown.filter(
+        (user) =>
+          user.name?.toLowerCase().includes(search) ||
+          user.nickname?.toLowerCase().includes(search) ||
+          (user.email && user.email.toLowerCase().includes(search)) ||
+          user.user_id.toString().includes(search)
+      );
+      setFilteredUsers(filtered);
     }
-  }, [userSearch, report]);
+  }, [userSearch, currentBreakdown]);
 
-  const fetchReport = async () => {
+  const fetchWeeklyReport = async () => {
     try {
       setLoading(true);
       const params: any = {};
-      if (selectedWeek) {
-        params.weekStart = selectedWeek;
-      }
+      if (selectedWeek) params.weekStart = selectedWeek;
       const queryString = new URLSearchParams(params).toString();
       const response = await api.get(`/users/reports/weekly?${queryString}`);
       setReport(response.data);
@@ -92,6 +114,27 @@ export default function ReportsPage() {
       console.error("Failed to fetch report:", err);
       setToast({
         message: err.response?.data?.error || "Failed to fetch weekly report",
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDailyReport = async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (selectedDate) params.date = selectedDate;
+      const queryString = new URLSearchParams(params).toString();
+      const response = await api.get(`/users/reports/daily?${queryString}`);
+      setDailyReport(response.data);
+      setFilteredUsers(response.data.userBreakdown || []);
+      if (!selectedDate && response.data.date) setSelectedDate(response.data.date);
+    } catch (err: any) {
+      console.error("Failed to fetch daily report:", err);
+      setToast({
+        message: err.response?.data?.error || "Failed to fetch daily report",
         type: "error",
       });
     } finally {
@@ -184,12 +227,37 @@ export default function ReportsPage() {
                 </button>
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                    Weekly Reports
+                    Reports
                   </h1>
                   <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                    Sales and rewards summary by week
+                    {reportType === "weekly" ? "Sales and rewards summary by week" : "Sales and points summary by day"}
                   </p>
                 </div>
+              </div>
+              {/* Tabs */}
+              <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setReportType("weekly")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                    reportType === "weekly"
+                      ? "bg-white text-primary-700 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Weekly Reports
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportType("daily")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                    reportType === "daily"
+                      ? "bg-white text-primary-700 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Daily Report
+                </button>
               </div>
             </div>
           </div>
@@ -200,39 +268,64 @@ export default function ReportsPage() {
           {/* Filters */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Week Selector */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Select Week
-                </label>
-                <select
-                  value={selectedWeek}
-                  onChange={(e) => setSelectedWeek(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
-                >
-                  <option value="">Current Week</option>
-                  {report?.availableWeeks.map((week) => {
-                    // week.week_start is "YYYY-MM-DD", format it as "Jan 8, 2026, 09:30 PM"
-                    const [year, month, day] = week.week_start
-                      .split("-")
-                      .map(Number);
-                    const date = new Date(year, month - 1, day, 21, 30, 0);
-                    const formatted = date.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    });
-                    return (
-                      <option key={week.week_start} value={week.week_start}>
-                        {formatted}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              {reportType === "weekly" ? (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Select Week
+                  </label>
+                  <select
+                    value={selectedWeek}
+                    onChange={(e) => setSelectedWeek(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
+                  >
+                    <option value="">Current Week</option>
+                    {report?.availableWeeks?.map((week) => {
+                      const [year, month, day] = (week.week_start || "").split("-").map(Number);
+                      const date = new Date(year, month - 1, day, 21, 30, 0);
+                      const formatted = date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      });
+                      return (
+                        <option key={week.week_start} value={week.week_start}>
+                          {formatted}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Select Date
+                  </label>
+                  <select
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
+                  >
+                    <option value="">Today</option>
+                    {dailyReport?.availableDates?.map((d) => {
+                      const dateStr = d.date;
+                      const [y, m, day] = dateStr.split("-").map(Number);
+                      const formatted = new Date(y, m - 1, day).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      });
+                      return (
+                        <option key={dateStr} value={dateStr}>
+                          {formatted}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
 
               {/* User Search */}
               <div>
@@ -249,12 +342,25 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Week Period Display */}
-            {report && (
+            {/* Period Display */}
+            {reportType === "weekly" && report && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-sm text-gray-600">
                   <span className="font-semibold">Period:</span>{" "}
                   {formatDate(report.weekStart)} - {formatDate(report.weekEnd)}
+                </p>
+              </div>
+            )}
+            {reportType === "daily" && dailyReport && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold">Date:</span>{" "}
+                  {new Date(dailyReport.date + "T12:00:00").toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </p>
               </div>
             )}
@@ -264,7 +370,7 @@ export default function ReportsPage() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
-          ) : report ? (
+          ) : (reportType === "weekly" && report) || (reportType === "daily" && dailyReport) ? (
             <>
               {/* Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
@@ -275,7 +381,7 @@ export default function ReportsPage() {
                         Total Users
                       </p>
                       <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                        {report.summary.total_users}
+                        {reportType === "weekly" ? report!.summary.total_users : dailyReport!.summary.total_users}
                       </p>
                     </div>
                     <div className="text-3xl sm:text-4xl">👥</div>
@@ -289,7 +395,7 @@ export default function ReportsPage() {
                         Total Orders
                       </p>
                       <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                        {report.summary.total_orders}
+                        {reportType === "weekly" ? report!.summary.total_orders : dailyReport!.summary.total_orders}
                       </p>
                     </div>
                     <div className="text-3xl sm:text-4xl">📦</div>
@@ -303,26 +409,42 @@ export default function ReportsPage() {
                         Total Sales
                       </p>
                       <p className="text-2xl sm:text-3xl font-bold text-primary-600">
-                        {formatCurrency(report.summary.total_sales)}
+                        {formatCurrency(reportType === "weekly" ? report!.summary.total_sales : dailyReport!.summary.total_sales)}
                       </p>
                     </div>
                     <div className="text-3xl sm:text-4xl">💰</div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs sm:text-sm text-gray-600 mb-1">
-                        Total Rewards
-                      </p>
-                      <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                        {formatCurrency(report.summary.total_rewards)}
-                      </p>
+                {reportType === "weekly" ? (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs sm:text-sm text-gray-600 mb-1">
+                          Total Rewards
+                        </p>
+                        <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                          {formatCurrency(report!.summary.total_rewards)}
+                        </p>
+                      </div>
+                      <div className="text-3xl sm:text-4xl">🎁</div>
                     </div>
-                    <div className="text-3xl sm:text-4xl">🎁</div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs sm:text-sm text-gray-600 mb-1">
+                          Points Added (Day)
+                        </p>
+                        <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                          {formatCurrency(dailyReport!.summary.total_admin_points)}
+                        </p>
+                      </div>
+                      <div className="text-3xl sm:text-4xl">💎</div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* User Breakdown */}
@@ -340,7 +462,7 @@ export default function ReportsPage() {
 
                 {filteredUsers.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
-                    <p>No users found for this week.</p>
+                    <p>{reportType === "weekly" ? "No users found for this week." : "No users found for this day."}</p>
                   </div>
                 ) : (
                   <>
@@ -469,7 +591,7 @@ export default function ReportsPage() {
             </>
           ) : (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-              <p>No report data available.</p>
+              <p>{reportType === "daily" ? "Select a date or wait for data to load." : "No report data available."}</p>
             </div>
           )}
         </main>

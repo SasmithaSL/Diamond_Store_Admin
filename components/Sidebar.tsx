@@ -55,7 +55,7 @@ export default function Sidebar({
     { href: "/dashboard?tab=users", label: "All Users", icon: "👥" },
     { href: "/dashboard?tab=orders", label: "Orders", icon: "📦" },
     { href: "/transactions", label: "Transactions", icon: "💎" },
-    { href: "/reports", label: "Weekly Reports", icon: "📈" },
+    { href: "/reports", label: "Reports", icon: "📈" },
     { href: "/announcements", label: "Announcements", icon: "📢" },
   ];
 

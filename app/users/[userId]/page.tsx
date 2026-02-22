@@ -22,8 +22,14 @@ interface UserDetails {
   points_balance: number;
   status: string;
   role: string;
+  referral_code: string | null;
   created_at: string;
   updated_at: string | null;
+  referred_by_id?: number | null;
+  referrer_id?: number | null;
+  referrer_name?: string | null;
+  referrer_nickname?: string | null;
+  referrer_referral_code?: string | null;
 }
 
 interface Transaction {
@@ -69,6 +75,8 @@ export default function UserDetailsPage() {
     url: string;
     title: string;
   } | null>(null);
+  const [roleSelect, setRoleSelect] = useState<string>("");
+  const [savingRole, setSavingRole] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -80,11 +88,31 @@ export default function UserDetailsPage() {
     }
   }, [userId, router]);
 
+  useEffect(() => {
+    if (user) setRoleSelect(user.role || "USER");
+  }, [user]);
+
   const showToast = (
     message: string,
     type: "success" | "error" | "info" = "info",
   ) => {
     setToast({ message, type });
+  };
+
+  const handleSaveRole = async () => {
+    if (!user || user.role === "ADMIN") return;
+    const newRole = roleSelect === "MERCHANT" ? "MERCHANT" : "USER";
+    if (newRole === user.role) return;
+    setSavingRole(true);
+    try {
+      const res = await api.patch(`/users/${user.id}/role`, { role: newRole });
+      setUser((prev) => (prev ? { ...prev, role: res.data.user.role, referral_code: res.data.user.referral_code ?? prev.referral_code } : null));
+      showToast(res.data.message || "Role updated", "success");
+    } catch (err: any) {
+      showToast(err.response?.data?.error || "Failed to update role", "error");
+    } finally {
+      setSavingRole(false);
+    }
   };
 
   const copyToClipboard = async (text: string, successMessage: string) => {
@@ -611,14 +639,96 @@ export default function UserDetailsPage() {
                         #{user.id}
                       </p>
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase">
-                        Role
-                      </label>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">
-                        {user.role}
-                      </p>
-                    </div>
+                    {user.role !== "ADMIN" && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase">
+                          Role
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <select
+                            value={roleSelect}
+                            onChange={(e) => setRoleSelect(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white focus:ring-2 focus:ring-primary-500"
+                          >
+                            <option value="USER">Reseller</option>
+                            <option value="MERCHANT">Merchant</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={handleSaveRole}
+                            disabled={savingRole || roleSelect === user.role}
+                            className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {savingRole ? "Saving…" : "Save role"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {user.role === "ADMIN" && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase">
+                          Role
+                        </label>
+                        <p className="text-lg font-semibold text-gray-900 mt-1">
+                          {user.role}
+                        </p>
+                      </div>
+                    )}
+                    {user.role === "MERCHANT" && user.referral_code && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase">
+                          Referral code
+                        </label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-lg font-mono font-semibold text-gray-900">
+                            {user.referral_code}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyToClipboard(
+                                user.referral_code!,
+                                "Referral code copied"
+                              )
+                            }
+                            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Resellers can use this code when registering to link to this merchant.
+                        </p>
+                      </div>
+                    )}
+                    {user.referred_by_id && (user.referrer_name || user.referrer_nickname || user.referrer_referral_code) && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase">
+                          Joined via referral
+                        </label>
+                        <div className="mt-1 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                          <p className="text-sm font-medium text-gray-900">
+                            Merchant: {user.referrer_nickname || user.referrer_name || "—"}
+                          </p>
+                          {user.referrer_referral_code && (
+                            <p className="text-sm text-gray-600 mt-0.5 font-mono">
+                              Code: {user.referrer_referral_code}
+                            </p>
+                          )}
+                          {user.referrer_id && (
+                            <Link
+                              href={`/users/${user.referrer_id}`}
+                              className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 mt-1"
+                            >
+                              View merchant profile
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase">
                         Diamond Balance

@@ -15,12 +15,15 @@ interface Transaction {
   transaction_type: string;
   description: string | null;
   admin_id: number | null;
+  merchant_id: number | null;
   created_at: string;
   user_name: string | null;
   user_id_number: string | null;
   user_email: string | null;
   user_nickname: string | null;
   admin_name: string | null;
+  merchant_name: string | null;
+  merchant_nickname: string | null;
 }
 
 interface ToastState {
@@ -306,7 +309,7 @@ export default function TransactionsPage() {
                         Description
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Admin
+                        Added by
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Receipt
@@ -411,7 +414,9 @@ export default function TransactionsPage() {
                             </p>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {transaction.admin_name || '-'}
+                            {transaction.merchant_id != null
+                              ? `Merchant: ${transaction.merchant_nickname || transaction.merchant_name || `#${transaction.merchant_id}`}`
+                              : (transaction.admin_name || '-')}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <button
@@ -614,6 +619,14 @@ export default function TransactionsPage() {
                   <p className="text-sm text-gray-500 mb-1">Description</p>
                   <p className="text-base font-semibold text-gray-800">
                     {selectedTransaction.description || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Added by</p>
+                  <p className="text-base font-semibold text-gray-800">
+                    {selectedTransaction.merchant_id != null
+                      ? `Merchant: ${selectedTransaction.merchant_nickname || selectedTransaction.merchant_name || `#${selectedTransaction.merchant_id}`}`
+                      : (selectedTransaction.admin_name || '-')}
                   </p>
                 </div>
               </div>

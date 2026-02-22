@@ -19,6 +19,10 @@ interface PendingUser {
   face_image: string | null;
   status: string;
   created_at: string;
+  referred_by_id?: number | null;
+  referrer_name?: string | null;
+  referrer_nickname?: string | null;
+  referrer_referral_code?: string | null;
 }
 
 interface ApprovedUser {
@@ -29,7 +33,13 @@ interface ApprovedUser {
   id_number: string;
   points_balance: number;
   status: string;
+  role?: string;
+  referral_code?: string | null;
   created_at: string;
+  referred_by_id?: number | null;
+  referrer_name?: string | null;
+  referrer_nickname?: string | null;
+  referrer_referral_code?: string | null;
 }
 
 interface Order {
@@ -690,7 +700,7 @@ export default function AdminDashboardPage() {
                 <>
                   {/* Table Header - Desktop */}
                   <div className="hidden md:grid md:grid-cols-12 gap-4 bg-gray-50 border-b border-gray-200 px-4 lg:px-6 py-3 lg:py-4">
-                    <div className="col-span-4">
+                    <div className="col-span-3">
                       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         User Information
                       </span>
@@ -700,7 +710,12 @@ export default function AdminDashboardPage() {
                         Email
                       </span>
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
+                      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Referred by
+                      </span>
+                    </div>
+                    <div className="col-span-2">
                       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Registered
                       </span>
@@ -784,6 +799,15 @@ export default function AdminDashboardPage() {
                               </p>
                             </div>
                           </div>
+                          {(user.referred_by_id && (user.referrer_name || user.referrer_nickname || user.referrer_referral_code)) && (
+                            <div className="text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded px-2 py-1">
+                              <span className="font-medium text-gray-700">Via referral: </span>
+                              {user.referrer_nickname || user.referrer_name || "Merchant"}
+                              {user.referrer_referral_code && (
+                                <span className="text-gray-500"> ({user.referrer_referral_code})</span>
+                              )}
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <svg
                               className="w-4 h-4 text-gray-400"
@@ -854,7 +878,7 @@ export default function AdminDashboardPage() {
                         {/* Desktop Table Layout */}
                         <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 lg:px-6 py-4 lg:py-5 items-center">
                           {/* User Information */}
-                          <div className="col-span-1 md:col-span-4">
+                          <div className="col-span-1 md:col-span-3">
                             <div className="flex items-center gap-4">
                               {user.face_image ? (
                                 <Link
@@ -942,8 +966,22 @@ export default function AdminDashboardPage() {
                             </div>
                           </div>
 
+                          {/* Referred by (Merchant) */}
+                          <div className="col-span-1 md:col-span-2">
+                            {user.referred_by_id && (user.referrer_name || user.referrer_nickname || user.referrer_referral_code) ? (
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">{user.referrer_nickname || user.referrer_name || "Merchant"}</span>
+                                {user.referrer_referral_code && (
+                                  <span className="text-gray-500 block text-xs">({user.referrer_referral_code})</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-400">—</span>
+                            )}
+                          </div>
+
                           {/* Registered Date */}
-                          <div className="col-span-1 md:col-span-3">
+                          <div className="col-span-1 md:col-span-2">
                             <div className="flex items-center gap-2">
                               <svg
                                 className="w-4 h-4 text-gray-400 flex-shrink-0"
@@ -1049,7 +1087,7 @@ export default function AdminDashboardPage() {
                 <>
                   {/* Table Header - Desktop */}
                   <div className="hidden md:grid md:grid-cols-12 gap-4 bg-gray-50 border-b border-gray-200 px-4 lg:px-6 py-3 lg:py-4">
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         User Information
                       </span>
@@ -1061,7 +1099,17 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="col-span-2">
                       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Referred by
+                      </span>
+                    </div>
+                    <div className="col-span-1">
+                      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Balance
+                      </span>
+                    </div>
+                    <div className="col-span-1">
+                      <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Role
                       </span>
                     </div>
                     <div className="col-span-2">
@@ -1069,7 +1117,7 @@ export default function AdminDashboardPage() {
                         Status
                       </span>
                     </div>
-                    <div className="col-span-3 text-right">
+                    <div className="col-span-2 text-right">
                       <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                         Actions
                       </span>
@@ -1124,6 +1172,15 @@ export default function AdminDashboardPage() {
                                 <p className="text-xs text-gray-500 mt-0.5">
                                   Email: {user.email || "N/A"}
                                 </p>
+                                <span className={`inline-flex mt-1 px-2 py-0.5 rounded text-xs font-semibold ${user.role === "MERCHANT" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-700"}`}>
+                                  {user.role === "MERCHANT" ? "Merchant" : "Reseller"}
+                                </span>
+                                {user.referred_by_id && (user.referrer_name || user.referrer_nickname || user.referrer_referral_code) && (
+                                  <div className="mt-1 text-xs text-gray-600 bg-blue-50 border border-blue-100 rounded px-2 py-1">
+                                    Via: {user.referrer_nickname || user.referrer_name || "Merchant"}
+                                    {user.referrer_referral_code && ` (${user.referrer_referral_code})`}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-gray-200">
@@ -1251,7 +1308,7 @@ export default function AdminDashboardPage() {
                           {/* Desktop Table Layout */}
                           <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 lg:px-6 py-4 lg:py-5 items-center">
                             {/* User Information */}
-                            <div className="col-span-1 md:col-span-3">
+                            <div className="col-span-1 md:col-span-2">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                                   {(user.name || "U")[0].toUpperCase()}
@@ -1316,8 +1373,22 @@ export default function AdminDashboardPage() {
                               </div>
                             </div>
 
-                            {/* Balance */}
+                            {/* Referred by (Merchant) */}
                             <div className="col-span-1 md:col-span-2">
+                              {user.referred_by_id && (user.referrer_name || user.referrer_nickname || user.referrer_referral_code) ? (
+                                <div className="text-sm text-gray-700">
+                                  <span className="font-medium">{user.referrer_nickname || user.referrer_name || "Merchant"}</span>
+                                  {user.referrer_referral_code && (
+                                    <span className="text-gray-500 block text-xs">({user.referrer_referral_code})</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-sm text-gray-400">—</span>
+                              )}
+                            </div>
+
+                            {/* Balance */}
+                            <div className="col-span-1 md:col-span-1">
                               <div className="flex items-center gap-2">
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
@@ -1334,6 +1405,13 @@ export default function AdminDashboardPage() {
                                   })}
                                 </span>
                               </div>
+                            </div>
+
+                            {/* Role */}
+                            <div className="col-span-1">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${user.role === "MERCHANT" ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-800"}`}>
+                                {user.role === "MERCHANT" ? "Merchant" : "Reseller"}
+                              </span>
                             </div>
 
                             {/* Status */}
@@ -1355,7 +1433,7 @@ export default function AdminDashboardPage() {
                             </div>
 
                             {/* Actions */}
-                            <div className="col-span-1 md:col-span-3 flex justify-end">
+                            <div className="col-span-1 md:col-span-2 flex justify-end">
                               <button
                                 onClick={() => {
                                   setShowAddPoints(user.id);
